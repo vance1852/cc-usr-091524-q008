@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:metering-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+app:
+  jwt-secret: test-secret-test-secret-test-secret-32bytes
+  admin-username: admin
+  admin-password: admin123

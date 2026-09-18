@@ -12,12 +12,14 @@ import com.admin.equipment.security.PasswordUtil;
 import com.admin.equipment.service.inspection.InspectionTemplateService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Component
+@Order(1)
 public class DataSeeder implements CommandLineRunner {
 
     private final AppUserRepository userRepo;

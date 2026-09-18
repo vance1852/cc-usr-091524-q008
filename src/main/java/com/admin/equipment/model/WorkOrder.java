@@ -40,6 +40,20 @@ public class WorkOrder {
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
 
+    // 来源：manual 手工创建 / inspection 巡检转单 / metering 计量越阈值自动创建
+    @Column(name = "source_type", length = 16)
+    private String sourceType = "manual";
+
+    // 计量自动开工单时的溯源信息（手工/巡检工单为 null）
+    @Column(name = "meter_id")
+    private Long meterId;
+
+    @Column(length = 48)
+    private String metric;
+
+    @Column(name = "trigger_reading_id")
+    private Long triggerReadingId;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getEquipmentId() { return equipmentId; }
@@ -60,4 +74,12 @@ public class WorkOrder {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getClosedAt() { return closedAt; }
     public void setClosedAt(LocalDateTime closedAt) { this.closedAt = closedAt; }
+    public String getSourceType() { return sourceType; }
+    public void setSourceType(String sourceType) { this.sourceType = sourceType; }
+    public Long getMeterId() { return meterId; }
+    public void setMeterId(Long meterId) { this.meterId = meterId; }
+    public String getMetric() { return metric; }
+    public void setMetric(String metric) { this.metric = metric; }
+    public Long getTriggerReadingId() { return triggerReadingId; }
+    public void setTriggerReadingId(Long triggerReadingId) { this.triggerReadingId = triggerReadingId; }
 }

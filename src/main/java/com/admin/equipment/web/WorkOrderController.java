@@ -3,8 +3,10 @@ package com.admin.equipment.web;
 import com.admin.equipment.model.WorkOrder;
 import com.admin.equipment.repo.EquipmentRepository;
 import com.admin.equipment.repo.WorkOrderRepository;
+import com.admin.equipment.service.metering.MaintenanceCompletionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -22,10 +24,13 @@ public class WorkOrderController {
 
     private final WorkOrderRepository repo;
     private final EquipmentRepository equipmentRepo;
+    private final MaintenanceCompletionService completionService;
 
-    public WorkOrderController(WorkOrderRepository repo, EquipmentRepository equipmentRepo) {
+    public WorkOrderController(WorkOrderRepository repo, EquipmentRepository equipmentRepo,
+                               MaintenanceCompletionService completionService) {
         this.repo = repo;
         this.equipmentRepo = equipmentRepo;
+        this.completionService = completionService;
     }
 
     public record WorkOrderRequest(Long equipmentId, String title, String type, String priority,
@@ -65,6 +70,7 @@ public class WorkOrderController {
     }
 
     @PatchMapping("/{id}/status")
+    @Transactional
     public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestBody StatusRequest req) {
         WorkOrder w = repo.findById(id).orElse(null);
         if (w == null) {
@@ -73,12 +79,23 @@ public class WorkOrderController {
         if (req.status() == null || !STATUSES.contains(req.status())) {
             return ResponseEntity.unprocessableEntity().body(Map.of("detail", "状态不合法"));
         }
+        boolean wasDone = "done".equals(w.getStatus());
+        boolean becomesDone = "done".equals(req.status());
+
         w.setStatus(req.status());
-        if ("done".equals(req.status())) {
+        if (becomesDone) {
             w.setClosedAt(LocalDateTime.now());
         } else {
             w.setClosedAt(null);
         }
-        return ResponseEntity.ok(repo.save(w));
+        w = repo.save(w);
+
+        // 保养工单完成 → 落本周期保养基准；由完成态重启 → 撤回基准，周期计算保持一致
+        if (!wasDone && becomesDone) {
+            completionService.onWorkOrderDone(w);
+        } else if (wasDone && !becomesDone) {
+            completionService.onWorkOrderReopened(w);
+        }
+        return ResponseEntity.ok(w);
     }
 }

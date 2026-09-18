@@ -500,6 +500,7 @@ public class InspectionTaskService {
         wo.setDescription("来源：巡检异常\n异常ID:" + ab.getId() + "\n任务ID:" + ab.getTaskId() + "\n" + ab.getDescription());
         wo.setAssignee("");
         wo.setStatus("open");
+        wo.setSourceType("inspection");
         return workOrderRepo.save(wo);
     }
 
