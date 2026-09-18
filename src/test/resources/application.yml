@@ -1,0 +1,21 @@
+server:
+  port: 0
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:meterdb;DB_CLOSE_DELAY=-1;MODE=MySQL;LOCK_TIMEOUT=10000
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+
+app:
+  jwt-secret: test-secret-test-secret-test-secret-0000
+  admin-username: admin
+  admin-password: admin123

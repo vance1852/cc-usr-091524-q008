@@ -3,6 +3,7 @@ package com.admin.equipment.web;
 import com.admin.equipment.model.WorkOrder;
 import com.admin.equipment.repo.EquipmentRepository;
 import com.admin.equipment.repo.WorkOrderRepository;
+import com.admin.equipment.service.meter.MeterTxService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,10 +23,13 @@ public class WorkOrderController {
 
     private final WorkOrderRepository repo;
     private final EquipmentRepository equipmentRepo;
+    private final MeterTxService meterTxService;
 
-    public WorkOrderController(WorkOrderRepository repo, EquipmentRepository equipmentRepo) {
+    public WorkOrderController(WorkOrderRepository repo, EquipmentRepository equipmentRepo,
+                               MeterTxService meterTxService) {
         this.repo = repo;
         this.equipmentRepo = equipmentRepo;
+        this.meterTxService = meterTxService;
     }
 
     public record WorkOrderRequest(Long equipmentId, String title, String type, String priority,
@@ -72,6 +76,10 @@ public class WorkOrderController {
         }
         if (req.status() == null || !STATUSES.contains(req.status())) {
             return ResponseEntity.unprocessableEntity().body(Map.of("detail", "状态不合法"));
+        }
+        if (w.getMeterMetric() != null) {
+            // 计量驱动工单：在计量项行锁内流转，完成时记录保养基准并关闭同周期提醒
+            return ResponseEntity.ok(meterTxService.applyWorkOrderStatus(w, req.status()));
         }
         w.setStatus(req.status());
         if ("done".equals(req.status())) {

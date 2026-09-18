@@ -4,16 +4,24 @@ import com.admin.equipment.model.AppUser;
 import com.admin.equipment.model.Equipment;
 import com.admin.equipment.model.WorkOrder;
 import com.admin.equipment.model.inspection.*;
+import com.admin.equipment.model.meter.MaintenanceReminder;
+import com.admin.equipment.model.meter.MeterDefinition;
+import com.admin.equipment.model.meter.MeterReading;
 import com.admin.equipment.repo.AppUserRepository;
 import com.admin.equipment.repo.EquipmentRepository;
 import com.admin.equipment.repo.WorkOrderRepository;
 import com.admin.equipment.repo.inspection.*;
+import com.admin.equipment.repo.meter.MaintenanceReminderRepository;
+import com.admin.equipment.repo.meter.MeterDefinitionRepository;
+import com.admin.equipment.repo.meter.MeterReadingRepository;
 import com.admin.equipment.security.PasswordUtil;
 import com.admin.equipment.service.inspection.InspectionTemplateService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,6 +36,9 @@ public class DataSeeder implements CommandLineRunner {
     private final InspectionTemplateItemRepository itemRepo;
     private final InspectionPlanRepository planRepo;
     private final InspectionPlanPointRepository planPointRepo;
+    private final MeterDefinitionRepository meterDefRepo;
+    private final MeterReadingRepository meterReadingRepo;
+    private final MaintenanceReminderRepository reminderRepo;
 
     @Value("${app.admin-username}")
     private String adminUsername;
@@ -40,7 +51,10 @@ public class DataSeeder implements CommandLineRunner {
                       InspectionTemplateRepository templateRepo,
                       InspectionTemplateItemRepository itemRepo,
                       InspectionPlanRepository planRepo,
-                      InspectionPlanPointRepository planPointRepo) {
+                      InspectionPlanPointRepository planPointRepo,
+                      MeterDefinitionRepository meterDefRepo,
+                      MeterReadingRepository meterReadingRepo,
+                      MaintenanceReminderRepository reminderRepo) {
         this.userRepo = userRepo;
         this.equipmentRepo = equipmentRepo;
         this.workOrderRepo = workOrderRepo;
@@ -49,6 +63,9 @@ public class DataSeeder implements CommandLineRunner {
         this.itemRepo = itemRepo;
         this.planRepo = planRepo;
         this.planPointRepo = planPointRepo;
+        this.meterDefRepo = meterDefRepo;
+        this.meterReadingRepo = meterReadingRepo;
+        this.reminderRepo = reminderRepo;
     }
 
     @Override
@@ -59,6 +76,7 @@ public class DataSeeder implements CommandLineRunner {
         List<InspectionPoint> points = seedInspectionPoints(equips);
         List<InspectionTemplate> templates = seedTemplates();
         seedPlans(points, templates);
+        seedMeterData(equips);
         System.out.println("种子数据初始化完成");
     }
 
@@ -266,6 +284,63 @@ public class DataSeeder implements CommandLineRunner {
             planPointRepo.save(newPlanPoint(plan4.getId(), p.getId(), seq++));
         }
         System.out.println("已初始化巡检计划种子数据 (4个计划)");
+    }
+
+    /**
+     * 计量驱动保养示范：仅给二号空压机 EQ-1002 配置“累计运行小时”，
+     * 阈值 1000h、提前量 100h，并灌入两条处于提前窗口内的读数形成一张待确认提醒。
+     * 其余种子设备不配置计量项，继续在无计量配置下工作。
+     */
+    private void seedMeterData(List<Equipment> equips) {
+        Equipment compressor = equips.stream()
+                .filter(e -> "EQ-1002".equals(e.getCode()))
+                .findFirst().orElse(null);
+        if (compressor == null) {
+            return;
+        }
+        if (meterDefRepo.existsByEquipmentIdAndMetric(compressor.getId(), "running_hours")) {
+            return;
+        }
+        MeterDefinition def = new MeterDefinition();
+        def.setEquipmentId(compressor.getId());
+        def.setMetric("running_hours");
+        def.setName("累计运行小时");
+        def.setUnit("h");
+        def.setThreshold(new BigDecimal("1000"));
+        def.setLead(new BigDecimal("100"));
+        def.setEnabled(true);
+        meterDefRepo.save(def);
+
+        LocalDateTime now = LocalDateTime.now();
+        meterReadingRepo.save(newReading(compressor.getId(), "AIR2-CTRL-00001",
+                new BigDecimal("950.0"), new BigDecimal("950.0"), now.minusHours(2)));
+        meterReadingRepo.save(newReading(compressor.getId(), "AIR2-CTRL-00002",
+                new BigDecimal("970.0"), new BigDecimal("970.0"), now.minusHours(1)));
+
+        MaintenanceReminder reminder = new MaintenanceReminder();
+        reminder.setEquipmentId(compressor.getId());
+        reminder.setMetric("running_hours");
+        reminder.setCycleStartValue(BigDecimal.ZERO);
+        reminder.setTriggerValue(new BigDecimal("970.0"));
+        reminder.setThresholdValue(new BigDecimal("1000"));
+        reminder.setLeadValue(new BigDecimal("100"));
+        reminder.setStatus(MaintenanceReminder.PENDING);
+        reminder.setTriggerSource("控制器读数 AIR2-CTRL-00002");
+        reminder.setMessage("二号空压机 累计运行小时 距保养仅剩 30 h，请提前安排");
+        reminderRepo.save(reminder);
+        System.out.println("已初始化空压机计量保养示范数据");
+    }
+
+    private MeterReading newReading(Long equipmentId, String sourceSeq,
+                                    BigDecimal display, BigDecimal cumulative, LocalDateTime readAt) {
+        MeterReading r = new MeterReading();
+        r.setEquipmentId(equipmentId);
+        r.setMetric("running_hours");
+        r.setSourceSeq(sourceSeq);
+        r.setDisplayValue(display);
+        r.setCumulativeValue(cumulative);
+        r.setReadAt(readAt);
+        return r;
     }
 
     private Equipment newEquip(String code, String name, String location, String type, String status) {

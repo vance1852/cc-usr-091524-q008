@@ -1,6 +1,7 @@
 package com.admin.equipment.model;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -40,6 +41,24 @@ public class WorkOrder {
     @Column(name = "closed_at")
     private LocalDateTime closedAt;
 
+    // —— 计量驱动保养的溯源字段（可空，手工/巡检工单不使用）——
+
+    // 触发工单的计量项编码
+    @Column(name = "meter_metric", length = 32)
+    private String meterMetric;
+
+    // 触发时所属保养周期的起点（历史累计值）
+    @Column(name = "cycle_start_value", precision = 18, scale = 3)
+    private BigDecimal cycleStartValue;
+
+    // 触发时的历史累计值
+    @Column(name = "meter_trigger_value", precision = 18, scale = 3)
+    private BigDecimal meterTriggerValue;
+
+    // 触发来源，如 控制器读数 AIR2-CTRL-00042 / 换表登记
+    @Column(name = "meter_trigger_source", length = 256)
+    private String meterTriggerSource;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getEquipmentId() { return equipmentId; }
@@ -60,4 +79,12 @@ public class WorkOrder {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getClosedAt() { return closedAt; }
     public void setClosedAt(LocalDateTime closedAt) { this.closedAt = closedAt; }
+    public String getMeterMetric() { return meterMetric; }
+    public void setMeterMetric(String meterMetric) { this.meterMetric = meterMetric; }
+    public BigDecimal getCycleStartValue() { return cycleStartValue; }
+    public void setCycleStartValue(BigDecimal cycleStartValue) { this.cycleStartValue = cycleStartValue; }
+    public BigDecimal getMeterTriggerValue() { return meterTriggerValue; }
+    public void setMeterTriggerValue(BigDecimal meterTriggerValue) { this.meterTriggerValue = meterTriggerValue; }
+    public String getMeterTriggerSource() { return meterTriggerSource; }
+    public void setMeterTriggerSource(String meterTriggerSource) { this.meterTriggerSource = meterTriggerSource; }
 }
